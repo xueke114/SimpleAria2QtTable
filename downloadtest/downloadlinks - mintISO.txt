@@ -1,0 +1,5 @@
+https://dldir1.qq.com/qqfile/qq/TIM3.3.9/TIM3.3.9.22051.exe
+https://mirrors.bfsu.edu.cn/anaconda/miniconda/Miniconda3-py38_4.11.0-Windows-x86_64.exe
+https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe
+http://dldir1.qq.com/qqfile/qq/PCQQ9.5.8/QQ9.5.8.28186.exe
+https://mirrors.bfsu.edu.cn/github-release/z4yx/GoAuthing/v2.2/auth-thu.win64.exe
