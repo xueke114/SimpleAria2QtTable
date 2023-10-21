@@ -10,6 +10,8 @@
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QNetworkAccessManager>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #include "ui_DownloadManager.h"
 
@@ -72,12 +74,24 @@ void DownloadManager::onPbStartClicked() {
     }
     saveDir.setPath(ui->leSaveDir->text().trimmed());
 
-    QNetworkRequest req(QUrl("http://127.0.0.1:6800"));
+    QNetworkRequest req(QUrl("http://127.0.0.1:6800/jsonrpc"));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    qnam.post(req, QByteArray(
-            "{'jsonrpc':'2.0','id':'qwer','method':'aria2.addUri','params':[['https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe']]}"));
 
+    QJsonObject postInfo;
+    postInfo["id"] = "qwer";
+    postInfo["jsonrpc"] = "2.0";
+    postInfo["method"] = "aria2.addUri";
 
+    QJsonArray array_urls;
+    QJsonArray array_params;
+    array_urls << "https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe";
+
+    array_params << array_urls;
+    postInfo["params"] = array_params;
+
+    auto json_data = QJsonDocument(postInfo).toJson(QJsonDocument::Compact);
+    qDebug() << json_data;
+    qnam.post(req, json_data);
 }
 
 DownloadManager::~DownloadManager() {
