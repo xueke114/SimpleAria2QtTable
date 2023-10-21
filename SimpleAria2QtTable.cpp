@@ -2,20 +2,14 @@
 // Created by xueke on 2022/2/15.
 //
 #include <aria2/aria2.h>
-#include <QLabel>
 #include <QThread> //Qt5 Required
 #include <QMetaType> // Qt5 Required
-#include <QLineEdit>
-#include <QPushButton>
-#include <QGridLayout>
 #include <QFileDialog>
-#include <QToolButton>
-#include <QHeaderView>
 #include <QMessageBox>
 #include <QTextStream>
-#include <QTableWidget>
-#include <QProgressBar>
 #include <QApplication>
+
+#include "ui_DownloadManager.h"
 
 // 要从下载线程传递给UI线程的原子数据包
 struct DownloadStatus {
@@ -138,15 +132,17 @@ public:
     }
 };
 
+namespace Ui {
+    class DownloadManager;
+}
+
 class DownloadManager : public QWidget {
 Q_OBJECT
+
 public:
-    DownloadManager();
+    explicit DownloadManager(QWidget *parent = nullptr);
 
-private:
-    void initFace();
-
-    void initPushButton();
+    ~DownloadManager() override;
 
 private slots:
 
@@ -163,65 +159,19 @@ private slots:
 
 private:
     QStringList downloadLinks;
+    Ui::DownloadManager *ui;
     QDir saveDir;
-private:
-    QPushButton *pbImportLinks = new QPushButton("导入链接");
-    QPushButton *pbStart = new QPushButton("全部开始");
-    QPushButton *pbPause = new QPushButton("全部暂停");
-    QPushButton *pbContinue = new QPushButton("全部继续");
-    QPushButton *pbStop = new QPushButton("全部停止");
-
-    QProgressBar *progress = new QProgressBar();
-    QTableWidget *tableList = new QTableWidget();
-
-    QLineEdit *leSaveDir = new QLineEdit();
-    QToolButton *tbGetSaveDir = new QToolButton();
 };
 
-void DownloadManager::initFace() {
-    //pushButton 初始状态
-    initPushButton();
-
-    resize(500, 300);
-    auto *lbProgress = new QLabel("总体进度：");
-    auto *lbSaveTo = new QLabel("保存至：");
-    tbGetSaveDir->setText("...");
-    progress->setFormat("%v/%m");
-
-    // 表头
-    tableList->horizontalHeader()->setStretchLastSection(true);
-    tableList->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    tableList->setColumnCount(5);
-    tableList->setHorizontalHeaderItem(0, new QTableWidgetItem("GID"));
-    tableList->setHorizontalHeaderItem(1, new QTableWidgetItem("文件大小"));
-    tableList->setHorizontalHeaderItem(2, new QTableWidgetItem("下载速度"));
-    tableList->setHorizontalHeaderItem(3, new QTableWidgetItem("进度"));
-//    tableList->setHorizontalHeaderItem(4, new QTableWidgetItem("剩余时间"));
-    tableList->setHorizontalHeaderItem(4, new QTableWidgetItem("文件名"));
-
-    auto *layout = new QGridLayout(this);
-    layout->addWidget(pbImportLinks, 0, 0, 1, 2);
-    layout->addWidget(pbStart, 0, 2, 1, 2);
-    layout->addWidget(pbPause, 0, 4, 1, 2);
-    layout->addWidget(pbContinue, 0, 6, 1, 2);
-    layout->addWidget(pbStop, 0, 8, 1, 2);
-
-    layout->addWidget(lbProgress, 1, 0, 1, 1);
-    layout->addWidget(progress, 1, 1, 1, 9);
-
-    layout->addWidget(tableList, 2, 0, 2, 10);
-
-    layout->addWidget(lbSaveTo, 4, 0, 1, 1);
-    layout->addWidget(leSaveDir, 4, 1, 1, 6);
-    layout->addWidget(tbGetSaveDir, 4, 7, 1, 1);
-
+DownloadManager::DownloadManager(QWidget *parent) : QWidget(parent), ui(new Ui::DownloadManager) {
+    ui->setupUi(this);
+    connect(ui->pbImportLinks, &QPushButton::clicked, this, &DownloadManager::onPbImportClicked);
+    connect(ui->pbStart, &QPushButton::clicked, this, &DownloadManager::onPbStartClicked);
+    connect(ui->tbGetSaveDir, &QToolButton::clicked, this, &DownloadManager::onTbGetSaveClicked);
 }
 
-DownloadManager::DownloadManager() {
-    initFace();
-    connect(pbImportLinks, &QPushButton::clicked, this, &DownloadManager::onPbImportClicked);
-    connect(pbStart, &QPushButton::clicked, this, &DownloadManager::onPbStartClicked);
-    connect(tbGetSaveDir, &QToolButton::clicked, this, &DownloadManager::onTbGetSaveClicked);
+DownloadManager::~DownloadManager() {
+    delete ui;
 }
 
 void DownloadManager::onPbImportClicked() {
@@ -229,7 +179,7 @@ void DownloadManager::onPbImportClicked() {
     while (filePath.isEmpty()) return;
     QFile file(filePath);
     saveDir.setPath(QFileInfo(file).canonicalPath());
-    leSaveDir->setText(saveDir.path());
+    ui->leSaveDir->setText(saveDir.path());
     if (file.open(QFile::ReadOnly | QFile::Text)) {
         downloadLinks.clear();
         QTextStream stream(&file);
@@ -238,37 +188,40 @@ void DownloadManager::onPbImportClicked() {
     }
     file.close();
 
-    progress->setMaximum(static_cast<int>(downloadLinks.count()));
-    pbStart->setEnabled(true);
+    ui->progress->setMaximum(static_cast<int>(downloadLinks.count()));
+    ui->pbStart->setEnabled(true);
 }
 
 void DownloadManager::onPbStartClicked() {
-    if (leSaveDir->text().trimmed().isEmpty()) {
+    if (ui->leSaveDir->text().trimmed().isEmpty()) {
         QMessageBox::critical(this, "错误", "保存位置未设置");
         return;
     }
-    saveDir.setPath(leSaveDir->text().trimmed());
+    saveDir.setPath(ui->leSaveDir->text().trimmed());
     auto *aria2 = new Aria2Thread(downloadLinks, saveDir.path());
 
     connect(aria2, &Aria2Thread::resultReady, this, &DownloadManager::updateTable);
-    connect(pbPause, &QPushButton::clicked, aria2, &Aria2Thread::pauseAll);
-    connect(pbContinue, &QPushButton::clicked, aria2, &Aria2Thread::unpauseAll);
-    connect(pbStop, &QPushButton::clicked, aria2, &Aria2Thread::shutdown);
-    connect(pbStop, &QPushButton::clicked, this, &DownloadManager::onPbStopClicked);
+    connect(ui->pbPause, &QPushButton::clicked, aria2, &Aria2Thread::pauseAll);
+    connect(ui->pbContinue, &QPushButton::clicked, aria2, &Aria2Thread::unpauseAll);
+    connect(ui->pbStop, &QPushButton::clicked, aria2, &Aria2Thread::shutdown);
+    connect(ui->pbStop, &QPushButton::clicked, this, &DownloadManager::onPbStopClicked);
 
 
     aria2->start();
-    pbStart->setDisabled(true);
-    pbPause->setEnabled(true);
-    pbContinue->setEnabled(true);
-    pbStop->setEnabled(true);
+    ui->pbStart->setDisabled(true);
+    ui->pbPause->setEnabled(true);
+    ui->pbContinue->setEnabled(true);
+    ui->pbStop->setEnabled(true);
 }
 
 void DownloadManager::onPbStopClicked() {
-    initPushButton();
-    tableList->setRowCount(0);
-    progress->reset();
-    leSaveDir->clear();
+    ui->pbStart->setDisabled(true);
+    ui->pbContinue->setDisabled(true);
+    ui->pbPause->setDisabled(true);
+    ui->pbStop->setDisabled(true);
+    ui->tableList->setRowCount(0);
+    ui->progress->reset();
+    ui->leSaveDir->clear();
 }
 
 void DownloadManager::onTbGetSaveClicked() {
@@ -276,12 +229,12 @@ void DownloadManager::onTbGetSaveClicked() {
     if (dir.isEmpty())
         return;
     saveDir.setPath(dir);
-    leSaveDir->setText(saveDir.path());
+    ui->leSaveDir->setText(saveDir.path());
 }
 
 void DownloadManager::updateTable(const QPair<QVector<DownloadStatus>, int> &fromAria2) {
-    tableList->setRowCount(static_cast<int>(fromAria2.first.size()));
-    progress->setValue(fromAria2.second);
+    ui->tableList->setRowCount(static_cast<int>(fromAria2.first.size()));
+    ui->progress->setValue(fromAria2.second);
     int i = 0;
     for (const auto &st: fromAria2.first) {
         auto *itemGID = new QTableWidgetItem(QString::fromStdString(aria2::gidToHex(st.gid)));
@@ -291,21 +244,15 @@ void DownloadManager::updateTable(const QPair<QVector<DownloadStatus>, int> &fro
 
         qint64 p = st.totalLength > 0 ? (100 * st.completedLength / st.totalLength) : 0;
         auto *itemProgress = new QTableWidgetItem(QString("%1 %").arg(p));
-        tableList->setItem(i, 0, itemGID);
-        tableList->setItem(i, 1, itemFileSize);
-        tableList->setItem(i, 2, itemSpeed);
-        tableList->setItem(i, 3, itemProgress);
-        tableList->setItem(i, 4, itemFileName);
+        ui->tableList->setItem(i, 0, itemGID);
+        ui->tableList->setItem(i, 1, itemFileSize);
+        ui->tableList->setItem(i, 2, itemSpeed);
+        ui->tableList->setItem(i, 3, itemProgress);
+        ui->tableList->setItem(i, 4, itemFileName);
         i++;
     }
 }
 
-void DownloadManager::initPushButton() {
-    pbStart->setDisabled(true);
-    pbContinue->setDisabled(true);
-    pbPause->setDisabled(true);
-    pbStop->setDisabled(true);
-}
 
 int main(int argc, char *argv[]) {
 
