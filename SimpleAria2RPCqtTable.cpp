@@ -4,8 +4,12 @@
 
 #include <QDir>
 #include <QWidget>
-#include <QApplication>
+#include <QMessageBox>
 #include <QFileDialog>
+#include <QApplication>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QNetworkAccessManager>
 
 #include "ui_DownloadManager.h"
 
@@ -25,15 +29,21 @@ private:
     QStringList downloadLinks;
     Ui::DownloadManager *ui;
     QDir saveDir;
+    QNetworkAccessManager qnam;
+    QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> reply;
 
 private slots:
 
     void onPbImportClicked();
+
+    void onPbStartClicked();
 };
 
 DownloadManager::DownloadManager(QWidget *parent) : QWidget(parent), ui(new Ui::DownloadManager) {
     ui->setupUi(this);
     connect(ui->pbImportLinks, &QPushButton::clicked, this, &DownloadManager::onPbImportClicked);
+    connect(ui->pbStart, &QPushButton::clicked, this, &DownloadManager::onPbStartClicked);
+
 }
 
 void DownloadManager::onPbImportClicked() {
@@ -53,6 +63,21 @@ void DownloadManager::onPbImportClicked() {
 
     ui->progress->setMaximum(static_cast<int>(downloadLinks.count()));
     ui->pbStart->setEnabled(true);
+}
+
+void DownloadManager::onPbStartClicked() {
+    if (ui->leSaveDir->text().trimmed().isEmpty()) {
+        QMessageBox::critical(this, "错误", "保存位置未设置");
+        return;
+    }
+    saveDir.setPath(ui->leSaveDir->text().trimmed());
+
+    QNetworkRequest req(QUrl("http://127.0.0.1:6800"));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    qnam.post(req, QByteArray(
+            "{'jsonrpc':'2.0','id':'qwer','method':'aria2.addUri','params':[['https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe']]}"));
+
+
 }
 
 DownloadManager::~DownloadManager() {
