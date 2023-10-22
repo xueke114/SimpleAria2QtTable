@@ -12,11 +12,48 @@
 #include <QNetworkAccessManager>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <utility>
 
 #include "ui_DownloadManager.h"
 
 namespace Ui {
     class DownloadManager;
+}
+
+class Aria2 {
+public:
+    explicit Aria2(const QUrl &aria2Server);
+
+    QString addUri(QUrl downloadLink, QMap<QString, QString> options);
+
+private:
+    QUrl requestUrl;
+    QJsonObject postInfo;
+    QNetworkRequest req;
+    QNetworkAccessManager qnam;
+    QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> reply;
+};
+
+Aria2::Aria2(const QUrl &aria2Server) {
+    if (aria2Server.isValid())
+        req.setUrl(aria2Server);
+
+    postInfo["id"] = "qwer";
+    postInfo["jsonrpc"] = "2.0";
+    postInfo["method"] = "aria2.addUri";
+}
+
+QString Aria2::addUri(QUrl downloadLink, QMap<QString, QString> options) {
+    QJsonArray array_urls;
+    QJsonArray array_params;
+    array_urls << "https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe";
+
+    array_params << array_urls;
+    postInfo["params"] = array_params;
+    auto json_data = QJsonDocument(postInfo).toJson(QJsonDocument::Compact);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    qnam.post(req, json_data);
+    return QString();
 }
 
 class DownloadManager : public QWidget {
@@ -31,8 +68,7 @@ private:
     QStringList downloadLinks;
     Ui::DownloadManager *ui;
     QDir saveDir;
-    QNetworkAccessManager qnam;
-    QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> reply;
+
 
 private slots:
 
@@ -73,25 +109,6 @@ void DownloadManager::onPbStartClicked() {
         return;
     }
     saveDir.setPath(ui->leSaveDir->text().trimmed());
-
-    QNetworkRequest req(QUrl("http://127.0.0.1:6800/jsonrpc"));
-    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QJsonObject postInfo;
-    postInfo["id"] = "qwer";
-    postInfo["jsonrpc"] = "2.0";
-    postInfo["method"] = "aria2.addUri";
-
-    QJsonArray array_urls;
-    QJsonArray array_params;
-    array_urls << "https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe";
-
-    array_params << array_urls;
-    postInfo["params"] = array_params;
-
-    auto json_data = QJsonDocument(postInfo).toJson(QJsonDocument::Compact);
-    qDebug() << json_data;
-    qnam.post(req, json_data);
 }
 
 DownloadManager::~DownloadManager() {
