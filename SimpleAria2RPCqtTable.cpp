@@ -12,7 +12,6 @@
 #include <QNetworkAccessManager>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <utility>
 
 #include "ui_DownloadManager.h"
 
@@ -22,9 +21,11 @@ namespace Ui {
 
 class Aria2 {
 public:
-    explicit Aria2(const QUrl &aria2Server);
+    Aria2();
 
-    QString addUri(QUrl downloadLink, QMap<QString, QString> options);
+    QString addUri(const QUrl& downloadLink, QMap<QString, QString> options);
+
+    void setServerUrl(const QUrl &serverUrl);
 
 private:
     QUrl requestUrl;
@@ -34,26 +35,30 @@ private:
     QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> reply;
 };
 
-Aria2::Aria2(const QUrl &aria2Server) {
-    if (aria2Server.isValid())
-        req.setUrl(aria2Server);
-
+Aria2::Aria2() {
     postInfo["id"] = "qwer";
     postInfo["jsonrpc"] = "2.0";
-    postInfo["method"] = "aria2.addUri";
 }
 
-QString Aria2::addUri(QUrl downloadLink, QMap<QString, QString> options) {
+QString Aria2::addUri(const QUrl& downloadLink, QMap<QString, QString> options) {
+    postInfo["method"] = "aria2.addUri";
     QJsonArray array_urls;
     QJsonArray array_params;
-    array_urls << "https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe";
+    array_urls << downloadLink.toString();
 
     array_params << array_urls;
     postInfo["params"] = array_params;
     auto json_data = QJsonDocument(postInfo).toJson(QJsonDocument::Compact);
-    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    qnam.post(req, json_data);
+    reply.reset(qnam.post(req, json_data));
+
     return QString();
+}
+
+void Aria2::setServerUrl(const QUrl &serverUrl) {
+    if (serverUrl.isValid()) {
+        req.setUrl(serverUrl);
+        req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    }
 }
 
 class DownloadManager : public QWidget {
@@ -68,6 +73,7 @@ private:
     QStringList downloadLinks;
     Ui::DownloadManager *ui;
     QDir saveDir;
+    Aria2 aria2;
 
 
 private slots:
@@ -79,6 +85,9 @@ private slots:
 
 DownloadManager::DownloadManager(QWidget *parent) : QWidget(parent), ui(new Ui::DownloadManager) {
     ui->setupUi(this);
+
+    aria2.setServerUrl(QUrl("http://127.0.0.1:6800/jsonrpc"));
+
     connect(ui->pbImportLinks, &QPushButton::clicked, this, &DownloadManager::onPbImportClicked);
     connect(ui->pbStart, &QPushButton::clicked, this, &DownloadManager::onPbStartClicked);
 
