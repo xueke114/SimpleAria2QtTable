@@ -12,7 +12,7 @@
 #include <QNetworkAccessManager>
 #include <QJsonObject>
 #include <QJsonArray>
-
+#include <map>
 #include "ui_DownloadManager.h"
 
 namespace Ui {
@@ -23,7 +23,7 @@ class Aria2 {
 public:
     Aria2();
 
-    QString addUri(const QUrl& downloadLink, QMap<QString, QString> options);
+    QString addUri(const QUrl &downloadLink, std::map<QString, QString> options);
 
     void setServerUrl(const QUrl &serverUrl);
 
@@ -40,16 +40,20 @@ Aria2::Aria2() {
     postInfo["jsonrpc"] = "2.0";
 }
 
-QString Aria2::addUri(const QUrl& downloadLink, QMap<QString, QString> options) {
+QString Aria2::addUri(const QUrl &downloadLink, std::map<QString, QString> options) {
     postInfo["method"] = "aria2.addUri";
     QJsonArray array_urls;
     QJsonArray array_params;
     array_urls << downloadLink.toString();
+    QJsonObject option_json;
+    for (auto [key, val]: options)
+        option_json[key] = val;
 
-    array_params << array_urls;
+    array_params << array_urls << option_json;
     postInfo["params"] = array_params;
     auto json_data = QJsonDocument(postInfo).toJson(QJsonDocument::Compact);
-    reply.reset(qnam.post(req, json_data));
+    qDebug() << json_data;
+    qnam.post(req, json_data);
 
     return QString();
 }
@@ -118,6 +122,8 @@ void DownloadManager::onPbStartClicked() {
         return;
     }
     saveDir.setPath(ui->leSaveDir->text().trimmed());
+    for (const auto &link: downloadLinks)
+        aria2.addUri(link, {{"dir", "C:/Users/xueke/Desktop"}});
 }
 
 DownloadManager::~DownloadManager() {
